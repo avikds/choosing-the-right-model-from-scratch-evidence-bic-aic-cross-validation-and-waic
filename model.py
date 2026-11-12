@@ -1069,3 +1069,127 @@ def bic_vs_evidence(ns, degree, alpha, beta, seed=1, noise=5.0,
 
     return results
 
+# Step 18 - loo_log_predictive
+def gaussian_logpdf(y, mean, var):
+    """
+    Compute the elementwise log probability density
+    of a Gaussian distribution.
+
+    Parameters:
+        y: Observed values.
+        mean: Gaussian predictive mean.
+        var: Gaussian predictive variance.
+
+    Returns:
+        Elementwise Gaussian log densities.
+    """
+
+    # Convert inputs to NumPy float arrays.
+    y = np.asarray(y, dtype=float)
+    mean = np.asarray(mean, dtype=float)
+    var = np.asarray(var, dtype=float)
+
+    # Variance must be strictly positive.
+    if np.any(var <= 0):
+        raise ValueError("Gaussian variance must be strictly positive.")
+
+    # Gaussian log probability density:
+    # log N(y | mean, var)
+    log_density = (
+        -0.5 * np.log(2.0 * math.pi * var)
+        - (y - mean) ** 2 / (2.0 * var)
+    )
+
+    return log_density
+
+
+def loo_log_predictive(X, y, alpha, beta, plugin=False):
+    """
+    Compute the leave-one-out predictive log density
+    for Bayesian linear regression.
+
+    For every observation, fit the posterior using all
+    other observations and predict the held-out observation.
+
+    Parameters:
+        X: Design matrix of shape (N, M).
+        y: Target vector of shape (N,).
+        alpha: Prior precision.
+        beta: Observation noise precision.
+        plugin: If True, use only the observation noise
+                variance (1/beta). Otherwise, use the
+                full posterior predictive variance.
+
+    Returns:
+        Sum of leave-one-out predictive log densities
+        as a Python float.
+    """
+
+    # Convert inputs into NumPy float arrays.
+    X = np.asarray(X, dtype=float)
+    y = np.asarray(y, dtype=float).reshape(-1)
+
+    # Validate input dimensions.
+    if X.ndim != 2:
+        raise ValueError("X must be a two-dimensional design matrix.")
+
+    N, M = X.shape
+
+    if N == 0 or M == 0:
+        raise ValueError("X must contain observations and features.")
+
+    if y.shape[0] != N:
+        raise ValueError("X and y must contain the same number of observations.")
+
+    if alpha <= 0 or beta <= 0:
+        raise ValueError("Alpha and beta must be strictly positive.")
+
+    # Initialize the cumulative log predictive density.
+    total_log_predictive = 0.0
+
+    # Leave out each observation one at a time.
+    for n in range(N):
+
+        # Create a mask that excludes the current observation.
+        mask = np.ones(N, dtype=bool)
+        mask[n] = False
+
+        # Training data excluding observation n.
+        X_train = X[mask]
+        y_train = y[mask]
+
+        # Fit the Gaussian posterior using the remaining observations.
+        m, S = blr_posterior(
+            X_train,
+            y_train,
+            alpha,
+            beta
+        )
+
+        # Predict the held-out observation using the full posterior.
+        mean, var = blr_predict(
+            X[n:n + 1],
+            m,
+            S,
+            beta
+        )
+
+        # Use the full predictive variance or the plug-in
+        # noise variance, depending on the selected option.
+        if plugin:
+            predictive_var = 1.0 / beta
+        else:
+            predictive_var = var[0]
+
+        # Calculate the log predictive density of the held-out
+        # observation and add it to the running total.
+        log_density = gaussian_logpdf(
+            y[n],
+            mean[0],
+            predictive_var
+        )
+
+        total_log_predictive += float(log_density)
+
+    return float(total_log_predictive)
+
