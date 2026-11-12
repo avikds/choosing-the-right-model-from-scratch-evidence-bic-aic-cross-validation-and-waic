@@ -31,6 +31,7 @@ python scaffold.py
 - [x] **19.** prequential_log_likelihood
 - [x] **20.** sample_posterior
 - [x] **21.** waic
+- [x] **22.** select_degree
 
 ---
 

@@ -1478,3 +1478,153 @@ def waic(X, y, W, beta):
         "elpd": float(elpd)
     }
 
+# Step 22 - select_degree
+def select_degree(x, y, degrees, center=5.0, scale=5.0,
+                  n_samples=400, seed=0):
+    """
+    Evaluate five model-selection criteria and select the
+    best polynomial degree for each criterion.
+
+    Parameters:
+        x: Input data.
+        y: Target values.
+        degrees: Candidate polynomial degrees.
+        center: Centering value for polynomial features.
+        scale: Scaling value for polynomial features.
+        n_samples: Number of posterior samples for WAIC.
+        seed: Random seed for posterior sampling.
+
+    Returns:
+        Dictionary mapping each criterion to its selected
+        polynomial degree:
+            evidence: Highest log marginal likelihood.
+            bic: Lowest BIC.
+            aic: Lowest AIC.
+            loo: Highest LOO predictive log density.
+            waic: Lowest WAIC.
+    """
+
+    # Convert inputs into NumPy float arrays.
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float).reshape(-1)
+
+    # Convert candidate degrees into a list.
+    degrees = list(degrees)
+
+    # Validate input dimensions.
+    if x.ndim != 1:
+        raise ValueError("x must be a one-dimensional array.")
+
+    if len(x) != len(y):
+        raise ValueError("x and y must contain the same number of observations.")
+
+    if len(x) == 0:
+        raise ValueError("The dataset cannot be empty.")
+
+    if len(degrees) == 0:
+        raise ValueError("At least one candidate degree is required.")
+
+    if not isinstance(n_samples, (int, np.integer)) or n_samples < 2:
+        raise ValueError("n_samples must be an integer of at least 2.")
+
+    if not np.all(np.isfinite(x)) or not np.all(np.isfinite(y)):
+        raise ValueError("Input data must contain finite values.")
+
+    # Store the scores for each candidate degree.
+    evidence_scores = []
+    bic_scores = []
+    aic_scores = []
+    loo_scores = []
+    waic_scores = []
+
+    # Evaluate every candidate polynomial degree.
+    for d in degrees:
+
+        # Construct the polynomial design matrix.
+        X = poly_design(
+            x,
+            d,
+            center=center,
+            scale=scale
+        )
+
+        # Estimate prior precision (alpha) and noise
+        # precision (beta) using empirical Bayes.
+        a, b = fit_alpha_beta(X, y)
+
+        # -------------------------------------------------
+        # 1. Bayesian model evidence (higher is better)
+        # -------------------------------------------------
+        evidence = blr_log_evidence(X, y, a, b)
+
+        # -------------------------------------------------
+        # 2. BIC and AIC (lower is better)
+        # -------------------------------------------------
+        ic = information_criteria(X, y)
+
+        bic = ic["bic"]
+        aic = ic["aic"]
+
+        # -------------------------------------------------
+        # 3. Leave-one-out cross-validation (higher is better)
+        # -------------------------------------------------
+        loo = loo_log_predictive(
+            X,
+            y,
+            a,
+            b
+        )
+
+        # -------------------------------------------------
+        # 4. WAIC (lower is better)
+        # -------------------------------------------------
+
+        # Compute the Gaussian posterior over regression weights.
+        m, S = blr_posterior(
+            X,
+            y,
+            a,
+            b
+        )
+
+        # Draw weight vectors from the posterior distribution.
+        W = sample_posterior(
+            m,
+            S,
+            n_samples,
+            seed
+        )
+
+        # Estimate WAIC using the posterior samples.
+        waic_result = waic(
+            X,
+            y,
+            W,
+            b
+        )
+
+        waic_score = waic_result["waic"]
+
+        # Store the scores for this polynomial degree.
+        evidence_scores.append(float(evidence))
+        bic_scores.append(float(bic))
+        aic_scores.append(float(aic))
+        loo_scores.append(float(loo))
+        waic_scores.append(float(waic_score))
+
+    # -------------------------------------------------
+    # Select the best polynomial degree for each criterion.
+    # np.argmax and np.argmin return the first occurrence
+    # when multiple values are tied.
+    # -------------------------------------------------
+
+    selected = {
+        "evidence": int(degrees[int(np.argmax(evidence_scores))]),
+        "bic": int(degrees[int(np.argmin(bic_scores))]),
+        "aic": int(degrees[int(np.argmin(aic_scores))]),
+        "loo": int(degrees[int(np.argmax(loo_scores))]),
+        "waic": int(degrees[int(np.argmin(waic_scores))])
+    }
+
+    return selected
+
