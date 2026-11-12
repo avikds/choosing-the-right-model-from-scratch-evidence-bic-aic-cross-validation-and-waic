@@ -32,6 +32,7 @@ python scaffold.py
 - [x] **20.** sample_posterior
 - [x] **21.** waic
 - [x] **22.** select_degree
+- [x] **23.** agreement_study
 
 ---
 

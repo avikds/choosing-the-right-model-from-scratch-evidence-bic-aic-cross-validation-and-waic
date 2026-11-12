@@ -1628,3 +1628,90 @@ def select_degree(x, y, degrees, center=5.0, scale=5.0,
 
     return selected
 
+# Step 23 - agreement_study
+def agreement_study(ns, noises, degrees, n_rep, seed=0, true_degree=2):
+    """
+    Measure how frequently each model-selection criterion
+    correctly identifies the true polynomial degree.
+
+    Parameters:
+        ns: Iterable of sample sizes.
+        noises: Iterable of noise levels.
+        degrees: Candidate polynomial degrees.
+        n_rep: Number of repetitions per (noise, n) pair.
+        seed: Base random seed.
+        true_degree: Actual polynomial degree.
+
+    Returns:
+        A list of dictionaries containing hit rates for
+        evidence, bic, aic, loo, and waic.
+    """
+
+    # Convert inputs into lists.
+    ns = list(ns)
+    noises = list(noises)
+    degrees = list(degrees)
+
+    if n_rep <= 0:
+        raise ValueError("n_rep must be positive.")
+
+    if not ns or not noises or not degrees:
+        raise ValueError("ns, noises, and degrees cannot be empty.")
+
+    if true_degree not in degrees:
+        raise ValueError("true_degree must be included in degrees.")
+
+    # Criteria to evaluate.
+    criteria = ["evidence", "bic", "aic", "loo", "waic"]
+
+    results = []
+
+    # Loop over noise levels (outer loop).
+    for noise in noises:
+
+        # Loop over sample sizes (inner loop).
+        for n in ns:
+
+            # Initialize correct-selection counters.
+            hits = {criterion: 0 for criterion in criteria}
+
+            # Run repeated experiments.
+            for r in range(n_rep):
+
+                # CORRECTED SEED FORMULA:
+                # Use a different reproducible dataset for each repetition.
+                x, y = make_poly_data(
+                    n,
+                    seed=seed + 1000 * r + n,
+                    noise=noise
+                )
+
+                # Evaluate all five criteria on the same dataset.
+                selected = select_degree(
+                    x,
+                    y,
+                    degrees,
+                    seed=r
+                )
+
+                # Count successful recovery of the true degree.
+                for criterion in criteria:
+                    if selected[criterion] == true_degree:
+                        hits[criterion] += 1
+
+            # Calculate hit rates and construct the result dictionary.
+            row = {
+                "noise": float(noise),
+                "n": int(n)
+            }
+
+            for criterion in criteria:
+                row[criterion] = round(
+                    float(hits[criterion] / n_rep),
+                    2
+                )
+
+            results.append(row)
+
+    return results
+
