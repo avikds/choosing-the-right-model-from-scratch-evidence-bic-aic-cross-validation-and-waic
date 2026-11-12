@@ -1002,3 +1002,70 @@ def laplace_log_evidence(X, y, alpha, beta):
 
     return float(log_evidence)
 
+# Step 17 - bic_vs_evidence
+def bic_vs_evidence(ns, degree, alpha, beta, seed=1, noise=5.0,
+                    center=5.0, scale=5.0):
+    """
+    Compare exact Bayesian log evidence with the BIC approximation
+    for different dataset sizes.
+
+    Parameters:
+        ns: Iterable of sample sizes.
+        degree: Polynomial degree.
+        alpha: Prior precision.
+        beta: Observation noise precision.
+        seed: Random seed for reproducibility.
+        noise: Standard deviation of Gaussian noise.
+        center: Centering value for polynomial features.
+        scale: Scaling value for polynomial features.
+
+    Returns:
+        A list of dictionaries containing:
+            n: Sample size (integer).
+            log_evidence: Exact log marginal likelihood.
+            j_bic: BIC approximation to log evidence.
+            gap_per_point: Difference per observation.
+    """
+
+    results = []
+
+    # Evaluate each requested sample size.
+    for n in ns:
+
+        n = int(n)
+
+        if n <= 0:
+            raise ValueError("Sample sizes must be positive.")
+
+        # Generate the dataset using the specified random seed.
+        x, y = make_poly_data(n, seed=seed, noise=noise)
+
+        # Construct the polynomial design matrix.
+        X = poly_design(
+            x,
+            degree,
+            center=center,
+            scale=scale
+        )
+
+        # Compute the exact Bayesian log marginal likelihood.
+        log_evidence = blr_log_evidence(X, y, alpha, beta)
+
+        # Compute the BIC approximation:
+        # J_BIC = -0.5 * BIC loss.
+        ic = information_criteria(X, y)
+        j_bic = -0.5 * ic["bic"]
+
+        # Calculate the approximation error per data point.
+        gap_per_point = (log_evidence - j_bic) / n
+
+        # Store the results with the required rounding.
+        results.append({
+            "n": int(n),
+            "log_evidence": round(float(log_evidence), 2),
+            "j_bic": round(float(j_bic), 2),
+            "gap_per_point": round(float(gap_per_point), 4)
+        })
+
+    return results
+

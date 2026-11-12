@@ -26,6 +26,7 @@ python scaffold.py
 - [x] **14.** occam_curve
 - [x] **15.** information_criteria
 - [x] **16.** laplace_log_evidence
+- [x] **17.** bic_vs_evidence
 
 ---
 
