@@ -1879,3 +1879,232 @@ def bma_log_density(ys, weights, comps):
 
     return np.asarray(log_mixture_density, dtype=float)
 
+# Step 25 - bma_vs_map
+def bma_vs_map(n, noise, degrees, n_rep, seed=0, n_test=200,
+               center=5.0, scale=5.0):
+    """
+    Compare Bayesian Model Averaging (BMA), MAP model selection,
+    and AIC plug-in prediction using held-out predictive density.
+
+    Parameters:
+        n: Number of training observations.
+        noise: Standard deviation of Gaussian noise.
+        degrees: Candidate polynomial degrees.
+        n_rep: Number of simulation repetitions.
+        seed: Base random seed.
+        n_test: Number of held-out test observations.
+        center: Centering value for polynomial features.
+        scale: Scaling value for polynomial features.
+
+    Returns:
+        Dictionary containing:
+            bma: Mean BMA predictive log density.
+            map: Mean MAP predictive log density.
+            aic_plugin: Mean AIC plug-in predictive log density.
+            bma_median: Median BMA predictive log density.
+            map_median: Median MAP predictive log density.
+            aic_plugin_median: Median AIC plug-in predictive log density.
+            bma_beats_map: Fraction of repetitions where BMA
+                           scores at least as well as MAP.
+    """
+
+    # Convert candidate degrees into a list.
+    degrees = list(degrees)
+
+    # Validate the inputs.
+    if n <= 0:
+        raise ValueError("Training sample size must be positive.")
+
+    if n_test <= 0:
+        raise ValueError("Test sample size must be positive.")
+
+    if n_rep <= 0:
+        raise ValueError("Number of repetitions must be positive.")
+
+    if len(degrees) == 0:
+        raise ValueError("At least one candidate degree is required.")
+
+    if noise < 0:
+        raise ValueError("Noise standard deviation cannot be negative.")
+
+    # Store the predictive scores from every repetition.
+    bma_scores = []
+    map_scores = []
+    aic_plugin_scores = []
+
+    # Repeat the experiment using different random seeds.
+    for r in range(n_rep):
+
+        # -------------------------------------------------
+        # 1. Generate training data.
+        # -------------------------------------------------
+        x, y = make_poly_data(
+            n,
+            seed=seed + r,
+            noise=noise
+        )
+
+        # -------------------------------------------------
+        # 2. Generate independent held-out test data.
+        # -------------------------------------------------
+        rs = np.random.RandomState(10000 + seed + r)
+
+        xs = rs.uniform(0, 10, n_test)
+
+        ys = (
+            (xs - 4) ** 2
+            + noise * rs.normal(size=n_test)
+        )
+
+        # -------------------------------------------------
+        # 3. Bayesian Model Averaging (BMA).
+        # -------------------------------------------------
+
+        # Obtain posterior model probabilities and predictive
+        # distributions for every candidate degree.
+        weights, comps = bma_predict(
+            x,
+            y,
+            xs,
+            degrees,
+            center=center,
+            scale=scale
+        )
+
+        # Compute the mixture log predictive density.
+        bma_log_scores = bma_log_density(
+            ys,
+            weights,
+            comps
+        )
+
+        # Mean log predictive density across test observations.
+        bma_score = float(np.mean(bma_log_scores))
+
+        # -------------------------------------------------
+        # 4. MAP model prediction.
+        # -------------------------------------------------
+
+        # Select the model with the highest posterior probability.
+        # np.argmax selects the first model in case of a tie.
+        map_idx = int(np.argmax(weights))
+
+        # Obtain the predictive mean and variance of that model.
+        map_mean, map_var = comps[map_idx]
+
+        # Score the selected model on the held-out test data.
+        map_log_scores = gaussian_logpdf(
+            ys,
+            map_mean,
+            map_var
+        )
+
+        map_score = float(np.mean(map_log_scores))
+
+        # -------------------------------------------------
+        # 5. AIC plug-in prediction.
+        # -------------------------------------------------
+
+        # Calculate the AIC score for every candidate degree.
+        aic_scores = []
+
+        design_matrices = []
+
+        for d in degrees:
+
+            X = poly_design(
+                x,
+                d,
+                center=center,
+                scale=scale
+            )
+
+            design_matrices.append(X)
+
+            ic = information_criteria(X, y)
+
+            aic_scores.append(ic["aic"])
+
+        # Select the degree with the lowest AIC.
+        aic_idx = int(np.argmin(aic_scores))
+
+        # Retrieve the training design matrix for the selected degree.
+        X = design_matrices[aic_idx]
+
+        # Construct the test design matrix.
+        Xs = poly_design(
+            xs,
+            degrees[aic_idx],
+            center=center,
+            scale=scale
+        )
+
+        # Fit the least-squares weights using training data.
+        w_hat = np.linalg.lstsq(
+            X,
+            y,
+            rcond=None
+        )[0]
+
+        # Calculate the training residual sum of squares.
+        residual = y - X @ w_hat
+
+        rss = float(residual @ residual)
+
+        # Maximum-likelihood estimate of the noise variance:
+        # sigma_hat^2 = RSS / n
+        sigma2 = max(rss / n, 1e-300)
+
+        # Predict the held-out observations using the
+        # least-squares weights.
+        aic_mean = Xs @ w_hat
+
+        # Score the AIC plug-in model using its MLE variance.
+        aic_log_scores = gaussian_logpdf(
+            ys,
+            aic_mean,
+            sigma2
+        )
+
+        aic_plugin_score = float(np.mean(aic_log_scores))
+
+        # -------------------------------------------------
+        # 6. Store the results for this repetition.
+        # -------------------------------------------------
+
+        bma_scores.append(bma_score)
+        map_scores.append(map_score)
+        aic_plugin_scores.append(aic_plugin_score)
+
+    # Convert score lists into NumPy arrays for aggregation.
+    bma_scores = np.asarray(bma_scores, dtype=float)
+    map_scores = np.asarray(map_scores, dtype=float)
+    aic_plugin_scores = np.asarray(aic_plugin_scores, dtype=float)
+
+    # Calculate mean predictive log densities.
+    bma_mean = float(np.mean(bma_scores))
+    map_mean = float(np.mean(map_scores))
+    aic_plugin_mean = float(np.mean(aic_plugin_scores))
+
+    # Calculate median predictive log densities.
+    bma_median = float(np.median(bma_scores))
+    map_median = float(np.median(map_scores))
+    aic_plugin_median = float(np.median(aic_plugin_scores))
+
+    # Fraction of repetitions in which BMA performs
+    # at least as well as MAP.
+    bma_beats_map = float(
+        np.mean(bma_scores >= map_scores)
+    )
+
+    # Return all required results rounded to the specified precision.
+    return {
+        "bma": round(bma_mean, 3),
+        "map": round(map_mean, 3),
+        "aic_plugin": round(aic_plugin_mean, 3),
+        "bma_median": round(bma_median, 3),
+        "map_median": round(map_median, 3),
+        "aic_plugin_median": round(aic_plugin_median, 3),
+        "bma_beats_map": round(bma_beats_map, 2)
+    }
+

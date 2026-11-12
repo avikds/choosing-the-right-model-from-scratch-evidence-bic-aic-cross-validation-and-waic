@@ -34,6 +34,7 @@ python scaffold.py
 - [x] **22.** select_degree
 - [x] **23.** agreement_study
 - [x] **24.** bma_predict
+- [x] **25.** bma_vs_map
 
 ---
 
