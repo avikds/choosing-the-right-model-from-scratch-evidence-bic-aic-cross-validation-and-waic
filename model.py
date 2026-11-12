@@ -91,3 +91,60 @@ def jeffreys_label(bf):
     else:
         return "decisive for M1"
 
+# Step 3 - bayes_factor_table
+def bayes_factor_table(n, a1=1.0, a0=1.0):
+    """
+    Reproduce the Bayesian coin comparison for every possible
+    number of heads in n tosses.
+
+    Parameters:
+        n: Total number of coin tosses.
+        a1: Beta prior parameter for heads.
+        a0: Beta prior parameter for tails.
+
+    Returns:
+        A list of dictionaries containing:
+        - n1: Number of heads.
+        - log10_bf: Logarithm (base 10) of the Bayes factor.
+        - label: Jeffreys' interpretation of the Bayes factor.
+    """
+
+    if n < 0:
+        raise ValueError("The number of tosses cannot be negative.")
+
+    results = []
+
+    # Iterate over every possible number of heads.
+    for n1 in range(n + 1):
+
+        # Number of tails.
+        n0 = n - n1
+
+        # Obtain log evidence for both coin models.
+        log_fair, log_biased = coin_log_evidence(
+            n1, n0, a1=a1, a0=a0
+        )
+
+        # Calculate the log Bayes factor:
+        # log(BF) = log p(D | M1) - log p(D | M0)
+        log_bf = log_biased - log_fair
+
+        # Convert the natural logarithm into base-10 logarithm.
+        log10_bf = log_bf / math.log(10)
+
+        # Calculate the Bayes factor itself for Jeffreys' scale.
+        # Handle overflow for extremely large Bayes factors.
+        try:
+            bf = math.exp(log_bf)
+        except OverflowError:
+            bf = math.inf
+
+        # Store the result in the required dictionary format.
+        results.append({
+            "n1": n1,
+            "log10_bf": round(log10_bf, 4),
+            "label": jeffreys_label(bf)
+        })
+
+    return results
+
