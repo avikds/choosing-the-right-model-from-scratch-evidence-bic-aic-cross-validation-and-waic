@@ -24,6 +24,7 @@ python scaffold.py
 - [x] **12.** fit_alpha_beta
 - [x] **13.** degree_posterior
 - [x] **14.** occam_curve
+- [x] **15.** information_criteria
 
 ---
 

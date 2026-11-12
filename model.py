@@ -845,3 +845,78 @@ def occam_curve(x, y, degrees, alpha, beta, center=0.0, scale=1.0):
 
     return results
 
+# Step 15 - information_criteria
+def information_criteria(X, y):
+    """
+    Score a Gaussian linear regression model using BIC, AIC, and MDL.
+
+    Parameters:
+        X: Design matrix of shape (N, M).
+        y: Target vector of shape (N,).
+
+    Returns:
+        Dictionary containing:
+            loglik: Maximized Gaussian log likelihood.
+            n_params: Number of model parameters (M + 1).
+            bic: Bayesian Information Criterion.
+            aic: Akaike Information Criterion.
+            mdl_bits: Minimum Description Length in bits.
+    """
+
+    # Convert inputs into NumPy float arrays.
+    X = np.asarray(X, dtype=float)
+    y = np.asarray(y, dtype=float).reshape(-1)
+
+    # Validate input dimensions.
+    if X.ndim != 2:
+        raise ValueError("X must be a two-dimensional design matrix.")
+
+    N, M = X.shape
+
+    if N == 0 or M == 0:
+        raise ValueError("X must contain observations and features.")
+
+    if y.shape[0] != N:
+        raise ValueError("X and y must contain the same number of observations.")
+
+    # Step 1: Estimate regression weights using maximum likelihood.
+    w_hat = np.linalg.lstsq(X, y, rcond=None)[0]
+
+    # Step 2: Compute residuals and residual sum of squares.
+    residual = y - X @ w_hat
+    rss = float(residual @ residual)
+
+    # Step 3: Estimate the maximum-likelihood noise variance.
+    # Apply the specified lower bound to avoid log(0).
+    sigma2 = max(rss / N, 1e-300)
+
+    # Step 4: Compute the maximized Gaussian log likelihood.
+    # loglik = -N/2 * (log(2*pi*sigma^2) + 1)
+    loglik = -0.5 * N * (
+        math.log(2.0 * math.pi * sigma2) + 1.0
+    )
+
+    # Number of parameters:
+    # M regression weights + 1 noise variance parameter.
+    n_params = M + 1
+
+    # Step 5: Calculate Bayesian Information Criterion.
+    bic = -2.0 * loglik + n_params * math.log(N)
+
+    # Step 6: Calculate Akaike Information Criterion.
+    aic = -2.0 * loglik + 2.0 * n_params
+
+    # Step 7: Calculate Minimum Description Length in bits.
+    mdl_bits = (
+        -loglik + 0.5 * n_params * math.log(N)
+    ) / math.log(2.0)
+
+    # Return the results using the required Python types.
+    return {
+        "loglik": float(loglik),
+        "n_params": int(n_params),
+        "bic": float(bic),
+        "aic": float(aic),
+        "mdl_bits": float(mdl_bits)
+    }
+
