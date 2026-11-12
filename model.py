@@ -373,3 +373,83 @@ def blr_predict(Xs, m, S, beta):
 
     return mean, var
 
+# Step 9 - blr_log_evidence
+def blr_log_evidence(X, y, alpha, beta):
+    """
+    Compute the log marginal likelihood of a Bayesian
+    linear regression model in weight space.
+
+    Parameters:
+        X: Design matrix of shape (N, M).
+        y: Target vector of shape (N,).
+        alpha: Prior precision.
+        beta: Observation noise precision.
+
+    Returns:
+        Log marginal likelihood as a Python float (in nats).
+    """
+
+    # Convert inputs into NumPy float arrays.
+    X = np.asarray(X, dtype=float)
+    y = np.asarray(y, dtype=float).reshape(-1)
+
+    # Validate input dimensions.
+    if X.ndim != 2:
+        raise ValueError("X must be a two-dimensional design matrix.")
+
+    N, M = X.shape
+
+    if N == 0 or M == 0:
+        raise ValueError("X must contain observations and features.")
+
+    if y.shape[0] != N:
+        raise ValueError("X and y must contain the same number of observations.")
+
+    if alpha <= 0 or beta <= 0:
+        raise ValueError("Alpha and beta must be strictly positive.")
+
+    # Construct the posterior precision matrix:
+    # A = alpha * I + beta * X.T @ X
+    A = alpha * np.eye(M) + beta * (X.T @ X)
+
+    # Compute the Cholesky factorization:
+    # A = L @ L.T
+    L = np.linalg.cholesky(A)
+
+    # Compute the posterior mean:
+    # m = beta * A^(-1) @ X.T @ y
+    # Solve the linear systems instead of explicitly inverting A.
+    rhs = beta * (X.T @ y)
+
+    m = np.linalg.solve(
+        L.T,
+        np.linalg.solve(L, rhs)
+    )
+
+    # Compute log determinant of A using its Cholesky factor:
+    # log|A| = 2 * sum(log(diag(L)))
+    log_det_A = 2.0 * np.sum(np.log(np.diag(L)))
+
+    # Compute the residual between observations and predictions.
+    residual = y - X @ m
+
+    # Compute the energy term:
+    # E(m) = (beta / 2) * ||y - Xm||^2
+    #       + (alpha / 2) * m.T @ m
+    E_m = (
+        0.5 * beta * (residual @ residual)
+        + 0.5 * alpha * (m @ m)
+    )
+
+    # Compute the log marginal likelihood:
+    # log p(y | X, alpha, beta)
+    log_evidence = (
+        0.5 * M * math.log(alpha)
+        + 0.5 * N * math.log(beta)
+        - E_m
+        - 0.5 * log_det_A
+        - 0.5 * N * math.log(2.0 * math.pi)
+    )
+
+    return float(log_evidence)
+

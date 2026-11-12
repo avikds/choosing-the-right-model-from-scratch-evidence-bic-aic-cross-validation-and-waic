@@ -18,6 +18,7 @@ python scaffold.py
 - [x] **6.** poly_design
 - [x] **7.** blr_posterior
 - [x] **8.** blr_predict
+- [x] **9.** blr_log_evidence
 
 ---
 
