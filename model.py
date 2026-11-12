@@ -62,3 +62,32 @@ def coin_log_evidence(n1, n0, a1=1.0, a0=1.0):
 
     return log_evidence_fair, log_evidence_beta
 
+# Step 2 - jeffreys_label
+def jeffreys_label(bf):
+    """
+    Translate a Bayes factor into qualitative evidence
+    using Jeffreys' scale.
+
+    bf = p(D | M1) / p(D | M0)
+    """
+
+    # Evidence in favor of M0
+    if bf < 1 / 100:
+        return "decisive for M0"
+    elif bf < 1 / 10:
+        return "strong for M0"
+    elif bf < 1 / 3:
+        return "moderate for M0"
+    elif bf < 1:
+        return "weak for M0"
+
+    # Evidence in favor of M1
+    elif bf < 3:
+        return "weak for M1"
+    elif bf < 10:
+        return "moderate for M1"
+    elif bf < 100:
+        return "strong for M1"
+    else:
+        return "decisive for M1"
+

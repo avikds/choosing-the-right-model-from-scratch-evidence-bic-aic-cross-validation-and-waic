@@ -11,6 +11,7 @@ python scaffold.py
 ## Steps
 
 - [x] **1.** coin_log_evidence
+- [x] **2.** jeffreys_label
 
 ---
 
