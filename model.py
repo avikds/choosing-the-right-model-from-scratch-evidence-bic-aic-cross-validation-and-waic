@@ -266,3 +266,58 @@ def poly_design(x, degree, center=0.0, scale=1.0):
 
     return Phi.astype(float, copy=False)
 
+# Step 7 - blr_posterior
+def blr_posterior(X, y, alpha, beta):
+    """
+    Compute the Gaussian posterior over Bayesian linear
+    regression weights.
+
+    Prior:
+        w ~ N(0, alpha^(-1) I)
+
+    Likelihood:
+        y ~ N(Xw, beta^(-1) I)
+
+    Parameters:
+        X: Design matrix of shape (N, M).
+        y: Target vector of shape (N,).
+        alpha: Prior precision.
+        beta: Observation noise precision.
+
+    Returns:
+        m: Posterior mean of shape (M,).
+        S: Posterior covariance matrix of shape (M, M).
+    """
+
+    # Convert inputs to NumPy float arrays.
+    X = np.asarray(X, dtype=float)
+    y = np.asarray(y, dtype=float).reshape(-1)
+
+    # Validate input dimensions.
+    if X.ndim != 2:
+        raise ValueError("X must be a two-dimensional design matrix.")
+
+    if X.shape[0] != y.shape[0]:
+        raise ValueError("X and y must contain the same number of observations.")
+
+    if alpha <= 0 or beta <= 0:
+        raise ValueError("Alpha and beta must be strictly positive.")
+
+    # Number of regression weights.
+    M = X.shape[1]
+
+    # Compute the posterior precision matrix.
+    precision = alpha * np.eye(M) + beta * (X.T @ X)
+
+    # Compute the posterior covariance matrix:
+    # S = (alpha * I + beta * X.T @ X)^(-1)
+    # Using solve is more numerically stable than explicitly
+    # calculating the matrix inverse.
+    S = np.linalg.solve(precision, np.eye(M))
+
+    # Compute the posterior mean:
+    # m = beta * S * X.T * y
+    m = beta * (S @ X.T @ y)
+
+    return m, S
+
