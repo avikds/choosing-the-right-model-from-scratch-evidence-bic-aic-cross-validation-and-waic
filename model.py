@@ -683,3 +683,86 @@ def fit_alpha_beta(X, y, alpha=1.0, beta=1.0, iters=200, tol=1e-8):
 
     return float(alpha), float(beta)
 
+# Step 13 - degree_posterior
+def degree_posterior(x, y, degrees, alpha=None, beta=None,
+                     center=0.0, scale=1.0):
+    """
+    Compute the posterior probabilities over polynomial degrees.
+
+    Parameters:
+        x: Input data.
+        y: Target values.
+        degrees: Candidate polynomial degrees.
+        alpha: Prior precision. If None, empirical Bayes is used.
+        beta: Noise precision. Required when alpha is specified.
+        center: Centering value for polynomial features.
+        scale: Scaling value for polynomial features.
+
+    Returns:
+        Dictionary containing:
+            degrees: Candidate polynomial degrees.
+            log_evidence: Log evidence for each degree, rounded to 2 decimals.
+            posterior: Posterior probabilities, rounded to 4 decimals.
+            map_degree: Degree with the highest posterior probability.
+            hyper: List of (alpha, beta) pairs, rounded to 6 decimals.
+    """
+
+    # Convert candidate degrees into a list.
+    degrees = list(degrees)
+
+    if len(degrees) == 0:
+        raise ValueError("At least one polynomial degree is required.")
+
+    # When alpha is provided, beta must also be provided.
+    if alpha is not None and beta is None:
+        raise ValueError("Beta must be provided when alpha is specified.")
+
+    log_evidences = []
+    hyper = []
+
+    # Evaluate each candidate polynomial degree.
+    for d in degrees:
+
+        # Construct the polynomial design matrix.
+        X = poly_design(x, d, center=center, scale=scale)
+
+        # Estimate hyperparameters using empirical Bayes
+        # when alpha is None.
+        if alpha is None:
+            a, b = fit_alpha_beta(X, y)
+        else:
+            # Use the provided hyperparameters for every degree.
+            a, b = float(alpha), float(beta)
+
+        # Compute the log marginal likelihood.
+        log_ev = blr_log_evidence(X, y, a, b)
+
+        # Store the evidence and hyperparameters.
+        log_evidences.append(float(log_ev))
+        hyper.append((float(a), float(b)))
+
+    # Compute posterior probabilities with a uniform prior
+    # over the candidate polynomial degrees.
+    posterior = model_posterior(log_evidences)
+
+    # Identify the MAP degree.
+    # np.argmax returns the first occurrence when values are tied.
+    map_index = int(np.argmax(posterior))
+    map_degree = int(degrees[map_index])
+
+    # Return the required dictionary with the specified rounding.
+    return {
+        "degrees": [int(d) for d in degrees],
+        "log_evidence": [
+            round(float(v), 2) for v in log_evidences
+        ],
+        "posterior": [
+            round(float(p), 4) for p in posterior
+        ],
+        "map_degree": map_degree,
+        "hyper": [
+            (round(float(a), 6), round(float(b), 6))
+            for a, b in hyper
+        ]
+    }
+

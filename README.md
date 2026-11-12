@@ -22,6 +22,7 @@ python scaffold.py
 - [x] **10.** gaussian_log_evidence
 - [x] **11.** model_posterior
 - [x] **12.** fit_alpha_beta
+- [x] **13.** degree_posterior
 
 ---
 
