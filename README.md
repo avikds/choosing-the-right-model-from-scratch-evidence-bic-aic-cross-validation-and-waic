@@ -25,6 +25,7 @@ python scaffold.py
 - [x] **13.** degree_posterior
 - [x] **14.** occam_curve
 - [x] **15.** information_criteria
+- [x] **16.** laplace_log_evidence
 
 ---
 

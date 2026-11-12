@@ -920,3 +920,85 @@ def information_criteria(X, y):
         "mdl_bits": float(mdl_bits)
     }
 
+# Step 16 - laplace_log_evidence
+def laplace_log_evidence(X, y, alpha, beta):
+    """
+    Compute the log marginal likelihood using the Laplace approximation.
+
+    For Bayesian linear regression, the log joint distribution is
+    quadratic in the weights, making this approximation exact.
+
+    Parameters:
+        X: Design matrix of shape (N, M).
+        y: Target vector of shape (N,).
+        alpha: Prior precision.
+        beta: Observation noise precision.
+
+    Returns:
+        Log marginal likelihood as a Python float (in nats).
+    """
+
+    # Convert inputs into NumPy float arrays.
+    X = np.asarray(X, dtype=float)
+    y = np.asarray(y, dtype=float).reshape(-1)
+
+    # Validate input dimensions.
+    if X.ndim != 2:
+        raise ValueError("X must be a two-dimensional design matrix.")
+
+    N, M = X.shape
+
+    if N == 0 or M == 0:
+        raise ValueError("X must contain observations and features.")
+
+    if y.shape[0] != N:
+        raise ValueError("X and y must contain the same number of observations.")
+
+    if alpha <= 0 or beta <= 0:
+        raise ValueError("Alpha and beta must be strictly positive.")
+
+    # Obtain the MAP estimate of the regression weights.
+    # For this Gaussian model, the MAP estimate equals the posterior mean.
+    m, _ = blr_posterior(X, y, alpha, beta)
+
+    # Compute residuals at the MAP estimate.
+    residual = y - X @ m
+
+    # Log likelihood at the MAP estimate:
+    # log p(y | X, m, beta)
+    log_likelihood = (
+        -0.5 * N * math.log(2.0 * math.pi)
+        + 0.5 * N * math.log(beta)
+        - 0.5 * beta * (residual @ residual)
+    )
+
+    # Log prior probability at the MAP estimate:
+    # log p(m | alpha)
+    log_prior = (
+        0.5 * M * math.log(alpha)
+        - 0.5 * M * math.log(2.0 * math.pi)
+        - 0.5 * alpha * (m @ m)
+    )
+
+    # Construct the Hessian of the negative log joint:
+    # H = alpha * I + beta * X.T @ X
+    H = alpha * np.eye(M) + beta * (X.T @ X)
+
+    # Calculate log|H| using the sign and log-absolute-determinant.
+    sign, log_det_H = np.linalg.slogdet(H)
+
+    if sign <= 0:
+        raise ValueError("The Hessian must be positive definite.")
+
+    # Apply the Laplace approximation:
+    # log p(D) ≈ log p(D | m) + log p(m)
+    #            - 0.5 * log|H| + (M/2) * log(2*pi)
+    log_evidence = (
+        log_likelihood
+        + log_prior
+        - 0.5 * log_det_H
+        + 0.5 * M * math.log(2.0 * math.pi)
+    )
+
+    return float(log_evidence)
+
