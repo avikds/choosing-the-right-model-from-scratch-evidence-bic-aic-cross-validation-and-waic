@@ -766,3 +766,82 @@ def degree_posterior(x, y, degrees, alpha=None, beta=None,
         ]
     }
 
+# Step 14 - occam_curve
+def occam_curve(x, y, degrees, alpha, beta, center=0.0, scale=1.0):
+    """
+    Compare maximum training likelihood with Bayesian model
+    evidence for different polynomial degrees.
+
+    Parameters:
+        x: Input data.
+        y: Target values.
+        degrees: List of polynomial degrees to evaluate.
+        alpha: Prior precision.
+        beta: Observation noise precision.
+        center: Centering value for polynomial features.
+        scale: Scaling value for polynomial features.
+
+    Returns:
+        A list of dictionaries containing:
+            degree: Polynomial degree.
+            train_ll: Maximum training log likelihood.
+            log_evidence: Bayesian log marginal likelihood.
+            occam: Log Occam factor (log_evidence - train_ll).
+    """
+
+    # Convert inputs into NumPy float arrays.
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float).reshape(-1)
+
+    # Validate inputs.
+    if x.ndim != 1 or x.shape[0] != y.shape[0]:
+        raise ValueError("x and y must be one-dimensional arrays of equal length.")
+
+    if len(y) == 0:
+        raise ValueError("The dataset cannot be empty.")
+
+    if alpha <= 0 or beta <= 0:
+        raise ValueError("Alpha and beta must be strictly positive.")
+
+    N = len(y)
+
+    results = []
+
+    # Evaluate each polynomial degree.
+    for d in degrees:
+
+        # Construct the polynomial design matrix.
+        X = poly_design(x, d, center=center, scale=scale)
+
+        # Find the least-squares weights using the
+        # Moore-Penrose pseudoinverse.
+        w_hat = np.linalg.lstsq(X, y, rcond=None)[0]
+
+        # Compute residuals at the least-squares solution.
+        residual = y - X @ w_hat
+
+        # Compute the maximum training log likelihood:
+        # train_ll = (N/2) * log(beta / (2*pi))
+        #            - (beta/2) * ||y - Xw_hat||^2
+        train_ll = (
+            0.5 * N * math.log(beta / (2.0 * math.pi))
+            - 0.5 * beta * (residual @ residual)
+        )
+
+        # Compute Bayesian log marginal likelihood
+        # using the previously implemented function.
+        log_ev = blr_log_evidence(X, y, alpha, beta)
+
+        # Compute the log Occam factor.
+        occam = log_ev - train_ll
+
+        # Store results in the required format.
+        results.append({
+            "degree": int(d),
+            "train_ll": round(float(train_ll), 2),
+            "log_evidence": round(float(log_ev), 2),
+            "occam": round(float(occam), 2)
+        })
+
+    return results
+

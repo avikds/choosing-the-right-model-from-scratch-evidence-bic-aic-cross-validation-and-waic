@@ -23,6 +23,7 @@ python scaffold.py
 - [x] **11.** model_posterior
 - [x] **12.** fit_alpha_beta
 - [x] **13.** degree_posterior
+- [x] **14.** occam_curve
 
 ---
 
