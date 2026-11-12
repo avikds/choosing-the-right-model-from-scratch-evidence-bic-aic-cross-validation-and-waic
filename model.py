@@ -1363,3 +1363,118 @@ def sample_posterior(m, S, n_samples, seed):
 
     return W
 
+# Step 21 - waic
+def waic(X, y, W, beta):
+    """
+    Estimate WAIC using Monte Carlo posterior samples.
+
+    Parameters:
+        X: Design matrix of shape (N, M).
+        y: Target vector of shape (N,).
+        W: Posterior weight samples of shape (S, M).
+           Each row contains one sampled weight vector.
+        beta: Observation noise precision.
+
+    Returns:
+        Dictionary containing Python floats:
+            lppd: Log pointwise predictive density.
+            p_waic: Effective number of parameters.
+            waic: Widely Applicable Information Criterion.
+            elpd: Expected log predictive density estimate.
+    """
+
+    # Convert inputs into NumPy float arrays.
+    X = np.asarray(X, dtype=float)
+    y = np.asarray(y, dtype=float).reshape(-1)
+    W = np.asarray(W, dtype=float)
+
+    # Validate input dimensions.
+    if X.ndim != 2:
+        raise ValueError("X must be a two-dimensional design matrix.")
+
+    if W.ndim != 2:
+        raise ValueError("W must be a two-dimensional array of weight samples.")
+
+    N, M = X.shape
+    S = W.shape[0]
+
+    if N == 0 or M == 0:
+        raise ValueError("X must contain observations and features.")
+
+    if y.shape[0] != N:
+        raise ValueError("X and y must contain the same number of observations.")
+
+    if W.shape[1] != M:
+        raise ValueError("W must contain one weight per design-matrix column.")
+
+    if S < 2:
+        raise ValueError("At least two posterior samples are required for sample variance.")
+
+    if beta <= 0:
+        raise ValueError("Beta must be strictly positive.")
+
+    # Step 1: Compute predictions for every posterior weight sample.
+    # W has shape (S, M), and X.T has shape (M, N).
+    # Predictions therefore have shape (S, N).
+    predictions = W @ X.T
+
+    # Step 2: Compute pointwise log likelihoods.
+    # Gaussian observation model:
+    # y_n | w_s ~ N(x_n.T @ w_s, 1/beta)
+    #
+    # log likelihood:
+    # ell_sn = -0.5*log(2*pi/beta)
+    #          -0.5*beta*(y_n - prediction_sn)^2
+
+    residuals = y[None, :] - predictions
+
+    log_likelihood = (
+        -0.5 * math.log(2.0 * math.pi / beta)
+        - 0.5 * beta * residuals**2
+    )
+
+    # Step 3: Compute the log pointwise predictive density (LPPD).
+    # Use the log-mean-exp trick for numerical stability:
+    # log(mean(exp(ell))) = max(ell) + log(mean(exp(ell - max(ell))))
+
+    max_per_point = np.max(log_likelihood, axis=0)
+
+    log_mean_exp = (
+        max_per_point
+        + np.log(
+            np.mean(
+                np.exp(log_likelihood - max_per_point[None, :]),
+                axis=0
+            )
+        )
+    )
+
+    # Sum over all observations.
+    lppd = float(np.sum(log_mean_exp))
+
+    # Step 4: Compute the WAIC complexity penalty.
+    # Use sample variance across posterior samples (ddof=1).
+    pointwise_variance = np.var(
+        log_likelihood,
+        axis=0,
+        ddof=1
+    )
+
+    p_waic = float(np.sum(pointwise_variance))
+
+    # Step 5: Compute WAIC.
+    # WAIC = -2 * (LPPD - p_WAIC)
+    waic_value = float(-2.0 * lppd + 2.0 * p_waic)
+
+    # Step 6: Compute the ELPD estimate.
+    # ELPD = LPPD - p_WAIC
+    elpd = float(lppd - p_waic)
+
+    # Return all required quantities as Python floats.
+    return {
+        "lppd": float(lppd),
+        "p_waic": float(p_waic),
+        "waic": float(waic_value),
+        "elpd": float(elpd)
+    }
+

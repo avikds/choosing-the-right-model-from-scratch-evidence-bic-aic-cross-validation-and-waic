@@ -30,6 +30,7 @@ python scaffold.py
 - [x] **18.** loo_log_predictive
 - [x] **19.** prequential_log_likelihood
 - [x] **20.** sample_posterior
+- [x] **21.** waic
 
 ---
 
