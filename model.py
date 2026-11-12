@@ -1193,3 +1193,123 @@ def loo_log_predictive(X, y, alpha, beta, plugin=False):
 
     return float(total_log_predictive)
 
+# Step 19 - prequential_log_likelihood
+def prequential_log_likelihood(X, y, alpha, beta, plugin=False, order=None):
+    """
+    Compute the prequential log likelihood as a sum of
+    one-step-ahead predictive log densities.
+
+    Parameters:
+        X: Design matrix of shape (N, M).
+        y: Target vector of shape (N,).
+        alpha: Prior precision.
+        beta: Observation noise precision.
+        plugin: If True, use only the noise variance (1/beta).
+                Otherwise, use the full posterior predictive variance.
+        order: Optional permutation of observation indices.
+               Defaults to [0, 1, ..., N-1].
+
+    Returns:
+        Sum of sequential predictive log densities as a Python float.
+    """
+
+    # Convert inputs into NumPy float arrays.
+    X = np.asarray(X, dtype=float)
+    y = np.asarray(y, dtype=float).reshape(-1)
+
+    # Validate input dimensions.
+    if X.ndim != 2:
+        raise ValueError("X must be a two-dimensional design matrix.")
+
+    N, M = X.shape
+
+    if N == 0 or M == 0:
+        raise ValueError("X must contain observations and features.")
+
+    if y.shape[0] != N:
+        raise ValueError("X and y must contain the same number of observations.")
+
+    if alpha <= 0 or beta <= 0:
+        raise ValueError("Alpha and beta must be strictly positive.")
+
+    # Determine the order in which observations are visited.
+    if order is None:
+        visit_order = list(range(N))
+    else:
+        order_array = np.asarray(order)
+
+        if order_array.ndim != 1:
+            raise ValueError("Order must be a one-dimensional sequence.")
+
+        if not np.issubdtype(order_array.dtype, np.integer):
+            raise ValueError("Order must contain integer row indices.")
+
+        visit_order = order_array.tolist()
+
+        # Ensure that order is a valid permutation of all observations.
+        if sorted(visit_order) != list(range(N)):
+            raise ValueError(
+                "Order must contain every row index exactly once."
+            )
+
+    # Initialize the cumulative prequential log likelihood.
+    total_log_likelihood = 0.0
+
+    # Visit each observation sequentially.
+    for k, idx in enumerate(visit_order):
+
+        if k == 0:
+            # First observation:
+            # No training observations are available.
+            # Use the prior distribution:
+            # m = 0
+            # S = (1/alpha) * I
+            m = np.zeros(M, dtype=float)
+            S = np.eye(M, dtype=float) / alpha
+
+        else:
+            # Use only the observations visited before the current one.
+            previous_indices = visit_order[:k]
+
+            X_previous = X[previous_indices]
+            y_previous = y[previous_indices]
+
+            # Compute the posterior using the previous observations.
+            m, S = blr_posterior(
+                X_previous,
+                y_previous,
+                alpha,
+                beta
+            )
+
+        # Predict the current observation using its posterior predictive
+        # distribution.
+        mean, var = blr_predict(
+            X[idx:idx + 1],
+            m,
+            S,
+            beta
+        )
+
+        # Select the predictive variance.
+        if plugin:
+            # Plug-in predictive variance:
+            # Only observation noise is considered.
+            predictive_var = 1.0 / beta
+        else:
+            # Full posterior predictive variance:
+            # Includes observation noise and weight uncertainty.
+            predictive_var = float(var[0])
+
+        # Compute the log predictive density of the current observation.
+        log_density = gaussian_logpdf(
+            y[idx],
+            mean[0],
+            predictive_var
+        )
+
+        # Add the one-step-ahead log predictive density.
+        total_log_likelihood += float(log_density)
+
+    return float(total_log_likelihood)
+
