@@ -577,3 +577,109 @@ def model_posterior(log_evidences, log_prior=None):
 
     return np.asarray(posterior, dtype=float)
 
+# Step 12 - fit_alpha_beta
+def fit_alpha_beta(X, y, alpha=1.0, beta=1.0, iters=200, tol=1e-8):
+    """
+    Estimate the prior precision (alpha) and noise precision (beta)
+    using empirical Bayes and MacKay's fixed-point updates.
+
+    Parameters:
+        X: Design matrix of shape (N, M).
+        y: Target vector of shape (N,).
+        alpha: Initial prior precision.
+        beta: Initial observation noise precision.
+        iters: Maximum number of iterations.
+        tol: Convergence tolerance.
+
+    Returns:
+        A tuple (alpha, beta) of Python floats.
+    """
+
+    # Convert inputs to NumPy float arrays.
+    X = np.asarray(X, dtype=float)
+    y = np.asarray(y, dtype=float).reshape(-1)
+
+    # Validate input dimensions.
+    if X.ndim != 2:
+        raise ValueError("X must be a two-dimensional design matrix.")
+
+    N, M = X.shape
+
+    if N == 0 or M == 0:
+        raise ValueError("X must contain observations and features.")
+
+    if y.shape[0] != N:
+        raise ValueError("X and y must contain the same number of observations.")
+
+    if alpha <= 0 or beta <= 0:
+        raise ValueError("Alpha and beta must be strictly positive.")
+
+    if iters < 0:
+        raise ValueError("Number of iterations cannot be negative.")
+
+    if tol < 0:
+        raise ValueError("Tolerance cannot be negative.")
+
+    # Precompute eigenvalues of X.T @ X.
+    # Clipping small negative values handles floating-point
+    # roundoff because X.T @ X is positive semidefinite.
+    eigvals = np.maximum(
+        np.linalg.eigvalsh(X.T @ X),
+        0.0
+    )
+
+    # Precompute X.T @ X and X.T @ y.
+    XtX = X.T @ X
+    Xty = X.T @ y
+
+    # MacKay's iterative fixed-point updates.
+    for _ in range(iters):
+
+        # Step 1: Compute posterior precision matrix.
+        A = alpha * np.eye(M) + beta * XtX
+
+        # Compute posterior mean:
+        # m = beta * A^(-1) @ X.T @ y
+        m = np.linalg.solve(A, beta * Xty)
+
+        # Eigenvalues of beta * X.T @ X.
+        lam = beta * eigvals
+
+        # Step 2: Compute effective number of parameters:
+        # gamma = sum(lambda_i / (lambda_i + alpha))
+        gamma = np.sum(lam / (lam + alpha))
+
+        # Step 3: Update prior precision alpha.
+        # alpha_new = gamma / (m.T @ m)
+        alpha_new = min(
+            gamma / max(float(m @ m), 1e-300),
+            1e6
+        )
+
+        # Compute residuals.
+        residual = y - X @ m
+
+        # Sum of squared residuals.
+        residual_sq = float(residual @ residual)
+
+        # Update noise precision beta.
+        # beta_new = (N - gamma) / ||y - Xm||^2
+        beta_new = min(
+            (N - gamma) / max(residual_sq, 1e-300),
+            1e8
+        )
+
+        # Step 4: Check convergence using relative changes
+        # expressed as absolute log ratios.
+        alpha_change = abs(math.log(alpha_new / alpha))
+        beta_change = abs(math.log(beta_new / beta))
+
+        # Update both precision parameters.
+        alpha, beta = alpha_new, beta_new
+
+        # Stop when both parameters have converged.
+        if alpha_change < tol and beta_change < tol:
+            break
+
+    return float(alpha), float(beta)
+
