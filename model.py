@@ -453,3 +453,71 @@ def blr_log_evidence(X, y, alpha, beta):
 
     return float(log_evidence)
 
+# Step 10 - gaussian_log_evidence
+def gaussian_log_evidence(X, y, alpha, beta):
+    """
+    Compute the log marginal likelihood in data space.
+
+    The weights are integrated out, giving:
+        y ~ N(0, C)
+
+    where:
+        C = I/beta + X @ X.T / alpha
+
+    Parameters:
+        X: Design matrix of shape (N, M).
+        y: Target vector of shape (N,).
+        alpha: Prior precision.
+        beta: Observation noise precision.
+
+    Returns:
+        Log marginal likelihood as a Python float (in nats).
+    """
+
+    # Convert inputs into NumPy float arrays.
+    X = np.asarray(X, dtype=float)
+    y = np.asarray(y, dtype=float).reshape(-1)
+
+    # Validate input dimensions.
+    if X.ndim != 2:
+        raise ValueError("X must be a two-dimensional design matrix.")
+
+    N, M = X.shape
+
+    if N == 0 or M == 0:
+        raise ValueError("X must contain observations and features.")
+
+    if y.shape[0] != N:
+        raise ValueError("X and y must contain the same number of observations.")
+
+    if alpha <= 0 or beta <= 0:
+        raise ValueError("Alpha and beta must be strictly positive.")
+
+    # Construct the covariance matrix in data space:
+    # C = I/beta + X @ X.T / alpha
+    C = (1.0 / beta) * np.eye(N) + (X @ X.T) / alpha
+
+    # Compute the Cholesky factorization:
+    # C = L @ L.T
+    L = np.linalg.cholesky(C)
+
+    # Calculate log determinant using the Cholesky factor:
+    # log|C| = 2 * sum(log(diag(L)))
+    log_det_C = 2.0 * np.sum(np.log(np.diag(L)))
+
+    # Solve L @ z = y.
+    # This gives y.T @ inv(C) @ y = z.T @ z.
+    z = np.linalg.solve(L, y)
+
+    # Compute the quadratic form.
+    quadratic_term = z @ z
+
+    # Compute the log Gaussian marginal likelihood:
+    log_evidence = (
+        -0.5 * N * math.log(2.0 * math.pi)
+        -0.5 * log_det_C
+        -0.5 * quadratic_term
+    )
+
+    return float(log_evidence)
+

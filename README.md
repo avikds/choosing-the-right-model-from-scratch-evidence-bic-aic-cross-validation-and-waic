@@ -19,6 +19,7 @@ python scaffold.py
 - [x] **7.** blr_posterior
 - [x] **8.** blr_predict
 - [x] **9.** blr_log_evidence
+- [x] **10.** gaussian_log_evidence
 
 ---
 
