@@ -29,6 +29,7 @@ python scaffold.py
 - [x] **17.** bic_vs_evidence
 - [x] **18.** loo_log_predictive
 - [x] **19.** prequential_log_likelihood
+- [x] **20.** sample_posterior
 
 ---
 

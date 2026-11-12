@@ -1313,3 +1313,53 @@ def prequential_log_likelihood(X, y, alpha, beta, plugin=False, order=None):
 
     return float(total_log_likelihood)
 
+# Step 20 - sample_posterior
+def sample_posterior(m, S, n_samples, seed):
+    """
+    Draw weight vectors from a Gaussian posterior N(m, S).
+
+    Parameters:
+        m: Posterior mean vector of shape (M,).
+        S: Posterior covariance matrix of shape (M, M).
+        n_samples: Number of posterior samples to generate.
+        seed: Random seed for reproducibility.
+
+    Returns:
+        W: NumPy array of shape (n_samples, M),
+           with one posterior weight sample per row.
+    """
+
+    # Convert inputs into NumPy float arrays.
+    m = np.asarray(m, dtype=float)
+    S = np.asarray(S, dtype=float)
+
+    # Validate the posterior mean and covariance dimensions.
+    if m.ndim != 1:
+        raise ValueError("m must be a one-dimensional vector.")
+
+    M = len(m)
+
+    if S.shape != (M, M):
+        raise ValueError("S must have shape (M, M).")
+
+    if not isinstance(n_samples, (int, np.integer)) or n_samples <= 0:
+        raise ValueError("n_samples must be a positive integer.")
+
+    # Initialize the reproducible random number generator.
+    rng = np.random.default_rng(seed)
+
+    # Compute the lower Cholesky factor:
+    # S = L @ L.T
+    L = np.linalg.cholesky(S)
+
+    # Generate independent standard normal samples.
+    # Shape: (n_samples, M)
+    Z = rng.standard_normal((n_samples, M))
+
+    # Transform the standard normal samples into samples
+    # from the Gaussian posterior N(m, S).
+    # W = m + Z @ L.T
+    W = m + Z @ L.T
+
+    return W
+
