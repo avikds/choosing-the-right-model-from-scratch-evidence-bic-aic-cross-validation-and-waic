@@ -521,3 +521,59 @@ def gaussian_log_evidence(X, y, alpha, beta):
 
     return float(log_evidence)
 
+# Step 11 - model_posterior
+def model_posterior(log_evidences, log_prior=None):
+    """
+    Compute the posterior probabilities over models using
+    their log marginal likelihoods and log prior probabilities.
+
+    Parameters:
+        log_evidences: List or NumPy array of log p(D | m).
+        log_prior: Optional array of log p(m).
+                   Uniform prior is assumed when None.
+
+    Returns:
+        A NumPy float array containing posterior probabilities
+        that sum to 1.
+    """
+
+    # Convert log evidences into a NumPy float array.
+    log_evidences = np.asarray(log_evidences, dtype=float)
+
+    # Validate the input.
+    if log_evidences.ndim != 1 or log_evidences.size == 0:
+        raise ValueError("log_evidences must be a non-empty one-dimensional array.")
+
+    if np.any(np.isnan(log_evidences)) or np.any(np.isposinf(log_evidences)):
+        raise ValueError("Log evidences cannot contain NaN or positive infinity.")
+
+    # Use uniform model priors when no log prior is provided.
+    if log_prior is None:
+        log_joint = log_evidences.copy()
+    else:
+        log_prior = np.asarray(log_prior, dtype=float)
+
+        if log_prior.shape != log_evidences.shape:
+            raise ValueError("log_prior and log_evidences must have the same shape.")
+
+        if np.any(np.isnan(log_prior)) or np.any(np.isposinf(log_prior)):
+            raise ValueError("Log priors cannot contain NaN or positive infinity.")
+
+        # Combine log evidence and log prior.
+        log_joint = log_evidences + log_prior
+
+    # Ensure at least one model has non-zero posterior support.
+    if not np.any(np.isfinite(log_joint)):
+        raise ValueError("At least one model must have finite log probability.")
+
+    # Subtract the maximum for numerical stability.
+    max_log_joint = np.max(log_joint)
+
+    # Convert log probabilities into unnormalized probabilities.
+    probabilities = np.exp(log_joint - max_log_joint)
+
+    # Normalize so that the posterior probabilities sum to 1.
+    posterior = probabilities / np.sum(probabilities)
+
+    return np.asarray(posterior, dtype=float)
+
