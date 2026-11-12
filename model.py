@@ -321,3 +321,55 @@ def blr_posterior(X, y, alpha, beta):
 
     return m, S
 
+# Step 8 - blr_predict
+def blr_predict(Xs, m, S, beta):
+    """
+    Compute the posterior predictive distribution for new inputs.
+
+    Parameters:
+        Xs: Test design matrix of shape (T, M).
+        m: Posterior mean vector of shape (M,).
+        S: Posterior covariance matrix of shape (M, M).
+        beta: Observation noise precision.
+
+    Returns:
+        mean: Predictive mean array of shape (T,).
+        var: Predictive variance array of shape (T,).
+    """
+
+    # Convert inputs into NumPy float arrays.
+    Xs = np.asarray(Xs, dtype=float)
+    m = np.asarray(m, dtype=float).reshape(-1)
+    S = np.asarray(S, dtype=float)
+
+    # Validate the observation noise precision.
+    if beta <= 0:
+        raise ValueError("Beta must be strictly positive.")
+
+    # Validate input dimensions.
+    if Xs.ndim != 2:
+        raise ValueError("Xs must be a two-dimensional test design matrix.")
+
+    if S.ndim != 2 or S.shape[0] != S.shape[1]:
+        raise ValueError("S must be a square covariance matrix.")
+
+    if Xs.shape[1] != m.shape[0]:
+        raise ValueError("Xs and m have incompatible dimensions.")
+
+    if S.shape != (m.shape[0], m.shape[0]):
+        raise ValueError("S and m have incompatible dimensions.")
+
+    # Compute the posterior predictive mean:
+    # mean = Xs @ m
+    mean = Xs @ m
+
+    # Compute the uncertainty contributed by the posterior weights:
+    # diag(Xs @ S @ Xs.T)
+    weight_uncertainty = np.sum((Xs @ S) * Xs, axis=1)
+
+    # Add observation noise variance:
+    # var = 1/beta + diag(Xs @ S @ Xs.T)
+    var = (1.0 / beta) + weight_uncertainty
+
+    return mean, var
+
