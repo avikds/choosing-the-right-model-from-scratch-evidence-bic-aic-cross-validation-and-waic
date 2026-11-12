@@ -227,3 +227,42 @@ def make_poly_data(n, seed=1, noise=5.0):
 
     return x, y
 
+# Step 6 - poly_design
+def poly_design(x, degree, center=0.0, scale=1.0):
+    """
+    Build the polynomial design matrix.
+
+    Parameters:
+        x: Input values (list or NumPy array).
+        degree: Maximum polynomial degree.
+        center: Value subtracted from each input.
+        scale: Value used to scale the centered inputs.
+
+    Returns:
+        A float NumPy array of shape (len(x), degree + 1),
+        with columns 1, z, z^2, ..., z^degree.
+    """
+
+    # Validate the polynomial degree.
+    if not isinstance(degree, (int, np.integer)) or degree < 0:
+        raise ValueError("Degree must be a non-negative integer.")
+
+    # Avoid division by zero during feature scaling.
+    if scale == 0:
+        raise ValueError("Scale must be non-zero.")
+
+    # Convert the input into a NumPy float array.
+    x = np.asarray(x, dtype=float)
+
+    if x.ndim != 1:
+        raise ValueError("Input x must be a one-dimensional array.")
+
+    # Center and scale the input values.
+    z = (x - center) / scale
+
+    # Construct polynomial features in ascending degree order.
+    # The first column is the constant term (1).
+    Phi = np.vander(z, N=degree + 1, increasing=True)
+
+    return Phi.astype(float, copy=False)
+

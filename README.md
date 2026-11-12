@@ -15,6 +15,7 @@ python scaffold.py
 - [x] **3.** bayes_factor_table
 - [x] **4.** coin_bic
 - [x] **5.** make_poly_data
+- [x] **6.** poly_design
 
 ---
 
