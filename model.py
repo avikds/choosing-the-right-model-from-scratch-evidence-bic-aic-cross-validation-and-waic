@@ -1715,3 +1715,167 @@ def agreement_study(ns, noises, degrees, n_rep, seed=0, true_degree=2):
 
     return results
 
+# Step 24 - bma_predict
+def bma_predict(x, y, xs, degrees, center=5.0, scale=5.0):
+    """
+    Compute Bayesian model-averaged predictive distributions.
+
+    For each polynomial degree:
+        1. Build training and test design matrices.
+        2. Estimate alpha and beta using empirical Bayes.
+        3. Compute the Gaussian posterior over weights.
+        4. Compute the posterior predictive distribution.
+        5. Compute the model's log marginal likelihood.
+
+    Parameters:
+        x: Training input values.
+        y: Training target values.
+        xs: Test input values.
+        degrees: Candidate polynomial degrees.
+        center: Centering value for polynomial features.
+        scale: Scaling value for polynomial features.
+
+    Returns:
+        weights: Posterior model probabilities as a NumPy array.
+        comps: List of (mean, var) predictive distribution pairs,
+               ordered according to degrees.
+    """
+
+    # Convert inputs into NumPy float arrays.
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float).reshape(-1)
+    xs = np.asarray(xs, dtype=float)
+
+    # Convert candidate degrees into a list.
+    degrees = list(degrees)
+
+    # Validate inputs.
+    if x.ndim != 1 or xs.ndim != 1:
+        raise ValueError("x and xs must be one-dimensional arrays.")
+
+    if len(x) != len(y):
+        raise ValueError("x and y must have the same number of observations.")
+
+    if len(x) == 0 or len(xs) == 0:
+        raise ValueError("Training and test datasets cannot be empty.")
+
+    if len(degrees) == 0:
+        raise ValueError("At least one polynomial degree is required.")
+
+    log_evidences = []
+    comps = []
+
+    # Evaluate every candidate polynomial degree.
+    for d in degrees:
+
+        # Construct the training and test design matrices.
+        X = poly_design(x, d, center=center, scale=scale)
+        Xs = poly_design(xs, d, center=center, scale=scale)
+
+        # Estimate prior and noise precisions using empirical Bayes.
+        alpha, beta = fit_alpha_beta(X, y)
+
+        # Compute the Gaussian posterior over regression weights.
+        m, S = blr_posterior(X, y, alpha, beta)
+
+        # Compute the posterior predictive mean and variance.
+        mean, var = blr_predict(Xs, m, S, beta)
+
+        # Compute the log marginal likelihood for this degree.
+        log_ev = blr_log_evidence(X, y, alpha, beta)
+
+        # Store the evidence and predictive distribution.
+        log_evidences.append(float(log_ev))
+        comps.append((mean, var))
+
+    # Convert log evidences into posterior model probabilities.
+    # A uniform prior over polynomial degrees is assumed.
+    weights = model_posterior(log_evidences)
+
+    return weights, comps
+
+
+def bma_log_density(ys, weights, comps):
+    """
+    Compute the log predictive density of a Bayesian
+    model-averaged mixture distribution.
+
+    The predictive density is:
+        p(ys | D) = sum_m weights[m] *
+                    N(ys | mean_m, var_m)
+
+    Parameters:
+        ys: Test target values.
+        weights: Posterior probabilities of the models.
+        comps: List of (mean, var) predictive distribution pairs.
+
+    Returns:
+        NumPy float array of shape (len(ys),) containing
+        the log predictive density for each test target.
+    """
+
+    # Convert inputs into NumPy float arrays.
+    ys = np.asarray(ys, dtype=float).reshape(-1)
+    weights = np.asarray(weights, dtype=float)
+
+    # Convert components into a list.
+    comps = list(comps)
+
+    # Validate inputs.
+    if ys.size == 0:
+        raise ValueError("ys cannot be empty.")
+
+    if weights.ndim != 1:
+        raise ValueError("weights must be a one-dimensional array.")
+
+    if len(weights) == 0 or len(weights) != len(comps):
+        raise ValueError("weights and comps must have the same non-zero length.")
+
+    if np.any(~np.isfinite(weights)) or np.any(weights < 0):
+        raise ValueError("Model weights must be finite and non-negative.")
+
+    log_terms = []
+
+    # Compute the log predictive density for each model.
+    for weight, (mean, var) in zip(weights, comps):
+
+        mean = np.asarray(mean, dtype=float).reshape(-1)
+        var = np.asarray(var, dtype=float).reshape(-1)
+
+        if mean.shape != ys.shape or var.shape != ys.shape:
+            raise ValueError(
+                "Each predictive mean and variance must match the shape of ys."
+            )
+
+        # Replace exactly zero model weights with 1e-300
+        # before taking the logarithm, as specified.
+        log_weight = math.log(max(float(weight), 1e-300))
+
+        # Log of the model-weighted Gaussian predictive density.
+        log_density = (
+            log_weight
+            + gaussian_logpdf(ys, mean, var)
+        )
+
+        log_terms.append(log_density)
+
+    # Stack model-specific log densities.
+    # Shape: (number of models, number of test observations).
+    log_terms = np.vstack(log_terms)
+
+    # Stable log-sum-exp across models.
+    # Subtract the maximum before exponentiation to avoid underflow.
+    max_log = np.max(log_terms, axis=0)
+
+    log_mixture_density = (
+        max_log
+        + np.log(
+            np.sum(
+                np.exp(log_terms - max_log[None, :]),
+                axis=0
+            )
+        )
+    )
+
+    return np.asarray(log_mixture_density, dtype=float)
+

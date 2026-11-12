@@ -33,6 +33,7 @@ python scaffold.py
 - [x] **21.** waic
 - [x] **22.** select_degree
 - [x] **23.** agreement_study
+- [x] **24.** bma_predict
 
 ---
 
