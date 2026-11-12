@@ -190,3 +190,40 @@ def coin_bic(n1, n0):
     # Return the BIC approximation in natural logarithm units (nats).
     return log_likelihood - bic_penalty
 
+# Step 5 - make_poly_data
+import numpy as np
+
+
+def make_poly_data(n, seed=1, noise=5.0):
+    """
+    Generate the polynomial-regression dataset.
+
+    True underlying function:
+        y = (x - 4)^2
+
+    Gaussian noise is added with the specified standard deviation.
+
+    Parameters:
+        n: Number of data points.
+        seed: Random seed for reproducibility.
+        noise: Standard deviation of Gaussian noise.
+
+    Returns:
+        A tuple (x, y) containing two NumPy float arrays
+        of shape (n,).
+    """
+
+    # Initialize the random number generator.
+    rs = np.random.RandomState(seed)
+
+    # Generate input values uniformly between 0 and 10.
+    x = rs.uniform(0, 10, n)
+
+    # Generate independent standard normal noise.
+    eps = rs.normal(size=n)
+
+    # Generate the polynomial output with Gaussian noise.
+    y = (x - 4) ** 2 + noise * eps
+
+    return x, y
+

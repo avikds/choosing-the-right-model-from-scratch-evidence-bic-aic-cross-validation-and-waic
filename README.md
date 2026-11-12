@@ -14,6 +14,7 @@ python scaffold.py
 - [x] **2.** jeffreys_label
 - [x] **3.** bayes_factor_table
 - [x] **4.** coin_bic
+- [x] **5.** make_poly_data
 
 ---
 
