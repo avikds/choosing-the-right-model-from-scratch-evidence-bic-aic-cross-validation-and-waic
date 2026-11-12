@@ -13,6 +13,7 @@ python scaffold.py
 - [x] **1.** coin_log_evidence
 - [x] **2.** jeffreys_label
 - [x] **3.** bayes_factor_table
+- [x] **4.** coin_bic
 
 ---
 

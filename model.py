@@ -148,3 +148,45 @@ def bayes_factor_table(n, a1=1.0, a0=1.0):
 
     return results
 
+# Step 4 - coin_bic
+def coin_bic(n1, n0):
+    """
+    Approximate the biased coin's log evidence using BIC.
+
+    Parameters:
+        n1: Number of observed heads.
+        n0: Number of observed tails.
+
+    Returns:
+        BIC approximation of the log evidence in nats.
+    """
+
+    if n1 < 0 or n0 < 0:
+        raise ValueError("Number of heads and tails cannot be negative.")
+
+    # Total number of tosses.
+    N = n1 + n0
+
+    if N == 0:
+        raise ValueError("Total number of tosses must be greater than zero.")
+
+    # Maximum likelihood estimate of the probability of heads.
+    theta_hat = n1 / N
+
+    # Log likelihood at the maximum likelihood estimate.
+    # Apply the convention 0 * log(0) = 0.
+    log_likelihood = 0.0
+
+    if n1 > 0:
+        log_likelihood += n1 * math.log(theta_hat)
+
+    if n0 > 0:
+        log_likelihood += n0 * math.log(1.0 - theta_hat)
+
+    # BIC penalty: (number of parameters / 2) * log(N).
+    # The biased coin model has one free parameter.
+    bic_penalty = 0.5 * math.log(N)
+
+    # Return the BIC approximation in natural logarithm units (nats).
+    return log_likelihood - bic_penalty
+
